@@ -1,10 +1,12 @@
 import React, { useRef, useState, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
-import { PerspectiveCamera } from "@react-three/drei";
+import { PerspectiveCamera, useHelper } from "@react-three/drei";
 import { EffectComposer, Bloom, Noise } from "@react-three/postprocessing";
 import { BlendFunction } from "postprocessing";
 import * as THREE from "three";
+import { SpotLightHelper } from "three";
 import TunnelParticles from "./components/TunnelParticles";
+import { useControls } from "leva";
 
 export default function Scene() {
   // References for animated objects
@@ -18,12 +20,60 @@ export default function Scene() {
   const section1Position = useRef(0);
   const section2Position = useRef(-30);
 
-  // Set up scene
+  // Control spotlight properties with leva
+  const {
+    lightColor,
+    intensity,
+    distance,
+    angle,
+    penumbra,
+    decay,
+    lightX,
+    lightY,
+    lightZ,
+    targetX,
+    targetY,
+    targetZ,
+    castShadowVal,
+    helperColor,
+    showHelper,
+  } = useControls("Spotlight Controls", {
+    lightColor: "#ffffff",
+    intensity: { value: 250, min: 0, max: 1000, step: 10 },
+    distance: { value: 46, min: 0, max: 200, step: 1 },
+    angle: { value: 0.57, min: 0, max: Math.PI / 2, step: 0.01 },
+    penumbra: { value: 0.17, min: 0, max: 1, step: 0.01 },
+    decay: { value: 2, min: 0, max: 5, step: 0.01 },
+    lightX: { value: -7, min: -50, max: 50, step: 0.5 },
+    lightY: { value: 12, min: -50, max: 50, step: 0.5 },
+    lightZ: { value: 3, min: -50, max: 50, step: 0.5 },
+    targetX: { value: 0, min: -50, max: 50, step: 0.5 },
+    targetY: { value: 4, min: -50, max: 50, step: 0.5 },
+    targetZ: { value: 10, min: -50, max: 50, step: 0.5 },
+    castShadowVal: true,
+    showHelper: true,
+    helperColor: "#ff0000",
+  });
+
+  // Set up scene and update light/target positions based on controls
   useEffect(() => {
     if (targetRef.current) {
-      targetRef.current.position.set(0, 4, 10);
+      targetRef.current.position.set(targetX, targetY, targetZ);
     }
-  }, []);
+    if (lightRef.current) {
+      lightRef.current.position.set(lightX, lightY, lightZ);
+      // The target object itself needs to be updated if its position changes via controls
+      // and it's a distinct object in the scene (which it is, via <primitive />)
+      if (lightRef.current.target) {
+        lightRef.current.target.position.set(targetX, targetY, targetZ);
+      }
+    }
+  }, [lightX, lightY, lightZ, targetX, targetY, targetZ]); // Only re-run if these specific positions change
+
+  // Add SpotLightHelper using useHelper from drei
+  // It will be added/removed based on the 'showHelper' control
+  // The helper uses the lightRef and updates automatically when the light's properties change.
+  useHelper(showHelper && lightRef, SpotLightHelper, helperColor);
 
   // Animation loop
   useFrame((state, delta) => {
@@ -42,6 +92,11 @@ export default function Scene() {
 
     // Update camera target
     state.camera.lookAt(0, 0.3, 0);
+
+    // Ensure the spotlight's target's world matrix is updated for the helper
+    if (lightRef.current && lightRef.current.target) {
+      lightRef.current.target.updateMatrixWorld();
+    }
   });
 
   return (
@@ -101,26 +156,36 @@ export default function Scene() {
         <meshStandardMaterial color="#303030" roughness={1} metalness={0} />
       </mesh>
 
-      {/* Light source */}
+      {/* Light source controlled by Leva */}
       <spotLight
         ref={lightRef}
-        castShadow
-        intensity={250}
-        position={[-7, 12, 3]}
+        castShadow={castShadowVal}
+        color={lightColor}
+        intensity={intensity}
         target={targetRef.current}
-        angle={0.3}
-        penumbra={0.2}
-        distance={50}
+        angle={angle}
+        penumbra={penumbra}
+        distance={distance}
+        decay={decay}
       />
 
-      {/* Light mesh (visual representation) */}
-      <mesh position={[-7, 12, 3]}>
+      {/* Light mesh (visual representation), position updated with light's actual position */}
+      {/* Its color also reflects the controlled light color */}
+      <mesh
+        position={lightRef.current ? [lightX, lightY, lightZ] : [-7, 12, 3]}
+      >
         <sphereGeometry args={[0.5, 16, 16]} />
-        <meshBasicMaterial color={new THREE.Color(1, 1, 1).multiplyScalar(5)} />
+        <meshBasicMaterial
+          color={new THREE.Color(lightColor).multiplyScalar(intensity / 250)}
+        />
       </mesh>
 
-      {/* Object targeted by light */}
-      <primitive object={targetRef.current} />
+      {/* Object targeted by light, its position is also controlled by Leva */}
+      {/* Ensure this primitive is correctly positioned based on targetX, targetY, targetZ */}
+      <primitive
+        object={targetRef.current}
+        position={[targetX, targetY, targetZ]}
+      />
 
       {/* Ambient light for basic visibility */}
       <ambientLight intensity={0.05} />
