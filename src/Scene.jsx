@@ -39,17 +39,17 @@ export default function Scene() {
     showHelper,
   } = useControls("Spotlight Controls", {
     lightColor: "#ffffff",
-    intensity: { value: 250, min: 0, max: 1000, step: 10 },
-    distance: { value: 46, min: 0, max: 200, step: 1 },
-    angle: { value: 0.57, min: 0, max: Math.PI / 2, step: 0.01 },
-    penumbra: { value: 0.17, min: 0, max: 1, step: 0.01 },
-    decay: { value: 2, min: 0, max: 5, step: 0.01 },
-    lightX: { value: -7, min: -50, max: 50, step: 0.5 },
-    lightY: { value: 12, min: -50, max: 50, step: 0.5 },
-    lightZ: { value: 3, min: -50, max: 50, step: 0.5 },
-    targetX: { value: 0, min: -50, max: 50, step: 0.5 },
-    targetY: { value: 2.5, min: -50, max: 50, step: 0.5 },
-    targetZ: { value: 1.5, min: -50, max: 50, step: 0.5 },
+    intensity: { value: 540, min: 0, max: 1000, step: 10 },
+    distance: { value: 36, min: 0, max: 200, step: 1 },
+    angle: { value: 0.7, min: 0, max: Math.PI / 2, step: 0.01 },
+    penumbra: { value: 0.31, min: 0, max: 1, step: 0.01 },
+    decay: { value: 1, min: 0, max: 5, step: 0.01 },
+    lightX: { value: -5.5, min: -50, max: 50, step: 0.5 },
+    lightY: { value: 15.5, min: -50, max: 50, step: 0.5 },
+    lightZ: { value: 3.5, min: -50, max: 50, step: 0.5 },
+    targetX: { value: -3.0, min: -50, max: 50, step: 0.5 },
+    targetY: { value: -2.0, min: -50, max: 50, step: 0.5 },
+    targetZ: { value: 3.5, min: -50, max: 50, step: 0.5 },
     castShadowVal: true,
     showHelper: true,
     helperColor: "#ff0000",
@@ -65,17 +65,15 @@ export default function Scene() {
     tunnelDepth,
     tunnelYPosition,
     tunnelZPosition,
-    tunnelReceiveShadow,
   } = useControls("Tunnel Controls", {
-    tunnelVisible: true,
+    tunnelVisible: false,
     tunnelColor: "#1f1f1f", // Slightly dark grey
     tunnelWireframe: false,
     tunnelWidth: { value: 12.5, min: 1, max: 50, step: 0.5 },
     tunnelHeight: { value: 13, min: 1, max: 50, step: 0.5 },
-    tunnelDepth: { value: 45, min: 10, max: 300, step: 1 },
+    tunnelDepth: { value: 65, min: 10, max: 300, step: 1 },
     tunnelYPosition: { value: 0.2, min: -20, max: 20, step: 0.25 },
-    tunnelZPosition: { value: 10, min: -50, max: 50, step: 1 },
-    tunnelReceiveShadow: false,
+    tunnelZPosition: { value: -31, min: -50, max: 50, step: 1 },
   });
 
   // Leva controls for TunnelParticles
@@ -84,17 +82,17 @@ export default function Scene() {
     baseCount: { value: 2500, min: 100, max: 10000, step: 100 },
     densityFactor: { value: 1.0, min: 0.1, max: 3.0, step: 0.1 },
     baseSize: { value: 0.35, min: 0.05, max: 1.0, step: 0.01 },
-    sizeRandomness: { value: 0.5, min: 0, max: 1, step: 0.05 }, // 0 = no random, 1 = full random spread
-    baseColor: "#ffffff",
-    colorRandomness: { value: 0.3, min: 0, max: 1, step: 0.05 },
+    sizeRandomness: { value: 0, min: 0, max: 1, step: 0.05 }, // 0 = no random, 1 = full random spread
+    baseColor: "#000000",
+    colorRandomness: { value: 0, min: 0, max: 1, step: 0.05 },
     // Base rotation (in radians for simplicity, can convert from degrees in leva if preferred)
     baseRotationX: { value: 0, min: 0, max: Math.PI * 2, step: 0.01 },
     baseRotationY: { value: 0, min: 0, max: Math.PI * 2, step: 0.01 },
     baseRotationZ: { value: 0, min: 0, max: Math.PI * 2, step: 0.01 },
     // Rotation randomness (factor)
-    rotationRandomnessX: { value: 1.0, min: 0, max: 1, step: 0.05 }, // 1 = full random like current
-    rotationRandomnessY: { value: 1.0, min: 0, max: 1, step: 0.05 },
-    rotationRandomnessZ: { value: 1.0, min: 0, max: 1, step: 0.05 },
+    rotationRandomnessX: { value: 0, min: 0, max: 1, step: 0.05 }, // 1 = full random like current
+    rotationRandomnessY: { value: 0, min: 0, max: 1, step: 0.05 },
+    rotationRandomnessZ: { value: 0, min: 0, max: 1, step: 0.05 },
   });
 
   // Set up scene and update light/target positions based on controls
@@ -202,10 +200,7 @@ export default function Scene() {
 
       {/* Unified Tunnel Box */}
       {tunnelVisible && (
-        <mesh
-          position={[0, tunnelYPosition, tunnelZPosition]}
-          receiveShadow={tunnelReceiveShadow}
-        >
+        <mesh position={[0, tunnelYPosition, tunnelZPosition]}>
           <boxGeometry args={[tunnelWidth, tunnelHeight, tunnelDepth]} />
           <meshStandardMaterial
             color={tunnelColor}
