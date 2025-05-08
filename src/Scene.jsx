@@ -39,19 +39,19 @@ export default function Scene() {
     showHelper,
   } = useControls("Spotlight Controls", {
     lightColor: "#ffffff",
-    intensity: { value: 540, min: 0, max: 1000, step: 10 },
-    distance: { value: 36, min: 0, max: 200, step: 1 },
+    intensity: { value: 850, min: 0, max: 1000, step: 10 },
+    distance: { value: 37, min: 0, max: 200, step: 1 },
     angle: { value: 0.7, min: 0, max: Math.PI / 2, step: 0.01 },
     penumbra: { value: 0.31, min: 0, max: 1, step: 0.01 },
     decay: { value: 1, min: 0, max: 5, step: 0.01 },
-    lightX: { value: -5.5, min: -50, max: 50, step: 0.5 },
+    lightX: { value: -3.5, min: -50, max: 50, step: 0.5 },
     lightY: { value: 15.5, min: -50, max: 50, step: 0.5 },
-    lightZ: { value: 3.5, min: -50, max: 50, step: 0.5 },
-    targetX: { value: -3.0, min: -50, max: 50, step: 0.5 },
+    lightZ: { value: 6, min: -50, max: 50, step: 0.5 },
+    targetX: { value: -1.0, min: -50, max: 50, step: 0.5 },
     targetY: { value: -2.0, min: -50, max: 50, step: 0.5 },
     targetZ: { value: 3.5, min: -50, max: 50, step: 0.5 },
     castShadowVal: true,
-    showHelper: true,
+    showHelper: false,
     helperColor: "#ff0000",
   });
 
@@ -79,12 +79,33 @@ export default function Scene() {
   // Leva controls for TunnelParticles
   const particleControls = useControls("Particle Controls", {
     particlesVisible: true,
-    baseCount: { value: 2500, min: 100, max: 10000, step: 100 },
-    densityFactor: { value: 1.0, min: 0.1, max: 3.0, step: 0.1 },
-    baseSize: { value: 0.35, min: 0.05, max: 1.0, step: 0.01 },
-    sizeRandomness: { value: 0, min: 0, max: 1, step: 0.05 }, // 0 = no random, 1 = full random spread
+    baseCount: { value: 3000, min: 100, max: 10000, step: 100 },
+    densityFactor: { value: 1.6, min: 0.1, max: 3.0, step: 0.1 },
+    particleBoxSize: {
+      value: 8.5,
+      min: 1,
+      max: 30,
+      step: 0.5,
+      label: "Box Size (XY)",
+    },
+    particleBoxDepth: {
+      value: 33,
+      min: 5,
+      max: 100,
+      step: 1,
+      label: "Box Depth (Z)",
+    },
+    particleBoxThickness: {
+      value: 0.83,
+      min: 0.01,
+      max: 10,
+      step: 0.01,
+      label: "Box Thickness",
+    },
+    baseSize: { value: 0.38, min: 0.05, max: 1.0, step: 0.01 },
+    sizeRandomness: { value: 0.15, min: 0, max: 1, step: 0.05 }, // 0 = no random, 1 = full random spread
     baseColor: "#000000",
-    colorRandomness: { value: 0, min: 0, max: 1, step: 0.05 },
+    colorRandomness: { value: 0.15, min: 0, max: 1, step: 0.05 },
     // Base rotation (in radians for simplicity, can convert from degrees in leva if preferred)
     baseRotationX: { value: 0, min: 0, max: Math.PI * 2, step: 0.01 },
     baseRotationY: { value: 0, min: 0, max: Math.PI * 2, step: 0.01 },
@@ -93,14 +114,30 @@ export default function Scene() {
     rotationRandomnessX: { value: 0, min: 0, max: 1, step: 0.05 }, // 1 = full random like current
     rotationRandomnessY: { value: 0, min: 0, max: 1, step: 0.05 },
     rotationRandomnessZ: { value: 0, min: 0, max: 1, step: 0.05 },
+    // Noise Controls
+    useParticleNoise: { value: true, label: "Use Noise" },
+    particleNoiseScale: {
+      value: 0.2,
+      min: 0.01,
+      max: 1.0,
+      step: 0.01,
+      label: "Noise Scale",
+    },
+    particleNoiseThreshold: {
+      value: -0.1,
+      min: -1.0,
+      max: 1.0,
+      step: 0.05,
+      label: "Noise Threshold",
+    },
   });
 
   // Leva controls for Camera
   const cameraControls = useControls("Camera Controls", {
-    cameraX: { value: -3.1, min: -50, max: 50, step: 0.1 },
-    cameraY: { value: -3.6, min: -50, max: 50, step: 0.1 },
-    cameraZ: { value: -13, min: -50, max: 50, step: 0.1 },
-    fov: { value: 42, min: 10, max: 120, step: 1 },
+    cameraX: { value: -3.2, min: -50, max: 50, step: 0.1 },
+    cameraY: { value: -2.7, min: -50, max: 50, step: 0.1 },
+    cameraZ: { value: -9.1, min: -50, max: 50, step: 0.1 },
+    fov: { value: 60, min: 10, max: 120, step: 1 },
     // Optional: Add lookAt controls later if needed
     // lookAtX: { value: 0, min: -20, max: 20, step: 0.1 },
     // lookAtY: { value: 0.3, min: -20, max: 20, step: 0.1 },
@@ -173,9 +210,9 @@ export default function Scene() {
             count={Math.floor(
               particleControls.baseCount * particleControls.densityFactor
             )} // Dynamic count
-            boxSize={10} // These might become dynamic later or derived if needed
-            boxDepth={30}
-            boxThickness={2}
+            boxSize={particleControls.particleBoxSize}
+            boxDepth={particleControls.particleBoxDepth}
+            boxThickness={particleControls.particleBoxThickness}
             // Pass new particle props
             visible={particleControls.particlesVisible}
             baseSize={particleControls.baseSize}
@@ -188,6 +225,10 @@ export default function Scene() {
             rotationRandomnessX={particleControls.rotationRandomnessX}
             rotationRandomnessY={particleControls.rotationRandomnessY}
             rotationRandomnessZ={particleControls.rotationRandomnessZ}
+            // Noise props
+            useParticleNoise={particleControls.useParticleNoise}
+            particleNoiseScale={particleControls.particleNoiseScale}
+            particleNoiseThreshold={particleControls.particleNoiseThreshold}
           />
         </group>
         <group ref={section2Ref} position={[0, 0, -29]}>
@@ -195,9 +236,9 @@ export default function Scene() {
             count={Math.floor(
               particleControls.baseCount * particleControls.densityFactor
             )} // Dynamic count
-            boxSize={10}
-            boxDepth={30}
-            boxThickness={2}
+            boxSize={particleControls.particleBoxSize}
+            boxDepth={particleControls.particleBoxDepth}
+            boxThickness={particleControls.particleBoxThickness}
             // Pass new particle props
             visible={particleControls.particlesVisible}
             baseSize={particleControls.baseSize}
@@ -210,6 +251,10 @@ export default function Scene() {
             rotationRandomnessX={particleControls.rotationRandomnessX}
             rotationRandomnessY={particleControls.rotationRandomnessY}
             rotationRandomnessZ={particleControls.rotationRandomnessZ}
+            // Noise props
+            useParticleNoise={particleControls.useParticleNoise}
+            particleNoiseScale={particleControls.particleNoiseScale}
+            particleNoiseThreshold={particleControls.particleNoiseThreshold}
           />
         </group>
       </group>

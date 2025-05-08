@@ -1,5 +1,6 @@
 import React, { useRef, useMemo, useEffect } from "react";
 import * as THREE from "three";
+import { createNoise2D } from "simplex-noise";
 
 export default function TunnelParticles({
   count = 2500,
@@ -17,46 +18,77 @@ export default function TunnelParticles({
   rotationRandomnessX = 1.0,
   rotationRandomnessY = 1.0,
   rotationRandomnessZ = 1.0,
+  useParticleNoise = true,
+  particleNoiseScale = 0.1,
+  particleNoiseThreshold = 0.0,
 }) {
   const meshRef = useRef();
   const geomRef = useRef();
   const tempObject = useMemo(() => new THREE.Object3D(), []);
   const tempColor = useMemo(() => new THREE.Color(), []);
 
+  const noise2D = useMemo(() => createNoise2D(), []);
+
   const particleData = useMemo(() => {
     const matrices = [];
     const colors = [];
     const halfBoxSize = boxSize / 2;
     const halfBoxThickness = boxThickness / 2;
-
     const initialColor = new THREE.Color(baseColor);
+    let createdParticles = 0;
 
     for (let i = 0; i < count; i++) {
       const face = Math.floor(Math.random() * 4);
       let x, y, z;
+      let noiseCoordX, noiseCoordY;
 
       if (face === 0) {
         x = THREE.MathUtils.randFloatSpread(boxSize);
         y =
           halfBoxSize +
           THREE.MathUtils.randFloat(-halfBoxThickness, halfBoxThickness);
+        noiseCoordX = x;
+        noiseCoordY = z;
       } else if (face === 1) {
         x = THREE.MathUtils.randFloatSpread(boxSize);
         y =
           -halfBoxSize +
           THREE.MathUtils.randFloat(-halfBoxThickness, halfBoxThickness);
+        noiseCoordX = x;
+        noiseCoordY = z;
       } else if (face === 2) {
         x =
           -halfBoxSize +
           THREE.MathUtils.randFloat(-halfBoxThickness, halfBoxThickness);
         y = THREE.MathUtils.randFloatSpread(boxSize);
+        noiseCoordX = y;
+        noiseCoordY = z;
       } else {
         x =
           halfBoxSize +
           THREE.MathUtils.randFloat(-halfBoxThickness, halfBoxThickness);
         y = THREE.MathUtils.randFloatSpread(boxSize);
+        noiseCoordX = y;
+        noiseCoordY = z;
       }
       z = THREE.MathUtils.randFloatSpread(boxDepth);
+
+      if (useParticleNoise) {
+        let primaryAxisOnFace, depthAxis;
+        if (face === 0 || face === 1) {
+          primaryAxisOnFace = x;
+        } else {
+          primaryAxisOnFace = y;
+        }
+        depthAxis = z;
+        const noiseValue = noise2D(
+          primaryAxisOnFace * particleNoiseScale,
+          depthAxis * particleNoiseScale
+        );
+        if (noiseValue < particleNoiseThreshold) {
+          continue;
+        }
+      }
 
       tempObject.position.set(x, y, z);
 
@@ -85,8 +117,9 @@ export default function TunnelParticles({
         );
       }
       colors.push(tempColor.r, tempColor.g, tempColor.b);
+      createdParticles++;
     }
-    return { matrices, colors };
+    return { matrices, colors, actualCount: createdParticles };
   }, [
     count,
     boxSize,
@@ -104,6 +137,10 @@ export default function TunnelParticles({
     rotationRandomnessZ,
     tempObject,
     tempColor,
+    noise2D,
+    useParticleNoise,
+    particleNoiseScale,
+    particleNoiseThreshold,
   ]);
 
   useEffect(() => {
@@ -116,14 +153,18 @@ export default function TunnelParticles({
 
     const colorAttribute = geomRef.current.getAttribute("color");
     if (colorAttribute) {
-      for (let i = 0; i < particleData.colors.length / 3; i++) {
+      const numColorValuesToWrite = Math.min(
+        particleData.actualCount,
+        particleData.colors.length / 3
+      );
+      for (let i = 0; i < numColorValuesToWrite; i++) {
         tempColor.fromArray(particleData.colors, i * 3);
         colorAttribute.setXYZ(i, tempColor.r, tempColor.g, tempColor.b);
       }
       colorAttribute.needsUpdate = true;
     }
 
-    meshRef.current.count = particleData.matrices.length;
+    meshRef.current.count = particleData.actualCount;
   }, [particleData, tempColor]);
 
   const particleGeometry = useMemo(() => {
@@ -140,6 +181,7 @@ export default function TunnelParticles({
 
   return (
     <instancedMesh
+      key={count}
       ref={meshRef}
       args={[null, null, count]}
       castShadow
