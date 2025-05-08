@@ -48,21 +48,33 @@ export default function Scene() {
     lightY: { value: 12, min: -50, max: 50, step: 0.5 },
     lightZ: { value: 3, min: -50, max: 50, step: 0.5 },
     targetX: { value: 0, min: -50, max: 50, step: 0.5 },
-    targetY: { value: 4, min: -50, max: 50, step: 0.5 },
-    targetZ: { value: 10, min: -50, max: 50, step: 0.5 },
+    targetY: { value: 2.5, min: -50, max: 50, step: 0.5 },
+    targetZ: { value: 1.5, min: -50, max: 50, step: 0.5 },
     castShadowVal: true,
     showHelper: true,
     helperColor: "#ff0000",
   });
 
-  // Controls for Corridor (Walls and Floor) and Ceiling
-  const { corridorColor, corridorWireframe, ceilingColor, ceilingWireframe } =
-    useControls("Corridor Controls", {
-      corridorColor: "#101010",
-      corridorWireframe: false,
-      ceilingColor: "#080808",
-      ceilingWireframe: false,
-    });
+  // New Leva controls for the unified tunnel
+  const {
+    tunnelVisible,
+    tunnelColor,
+    tunnelWireframe,
+    tunnelWidth,
+    tunnelHeight,
+    tunnelDepth,
+    tunnelYPosition,
+    tunnelZPosition,
+  } = useControls("Tunnel Controls", {
+    tunnelVisible: true,
+    tunnelColor: "#1f1f1f", // Slightly dark grey
+    tunnelWireframe: false,
+    tunnelWidth: { value: 12.5, min: 1, max: 50, step: 0.5 },
+    tunnelHeight: { value: 13, min: 1, max: 50, step: 0.5 },
+    tunnelDepth: { value: 45, min: 10, max: 300, step: 1 },
+    tunnelYPosition: { value: 0.2, min: -20, max: 20, step: 0.25 },
+    tunnelZPosition: { value: 10, min: -50, max: 50, step: 1 },
+  });
 
   // Set up scene and update light/target positions based on controls
   useEffect(() => {
@@ -139,42 +151,20 @@ export default function Scene() {
         </group>
       </group>
 
-      {/* Tunnel walls */}
-      <mesh receiveShadow position={[7, 0, 0]}>
-        <boxGeometry args={[1, 14, 26]} />
-        <meshStandardMaterial
-          color={corridorColor}
-          wireframe={corridorWireframe}
-        />
-      </mesh>
-      <mesh receiveShadow position={[-7, 0, 0]}>
-        <boxGeometry args={[1, 14, 26]} />
-        <meshStandardMaterial
-          color={corridorColor}
-          wireframe={corridorWireframe}
-        />
-      </mesh>
-
-      {/* Ceiling pieces */}
-      <mesh castShadow receiveShadow position={[0, 7, -5]}>
-        <boxGeometry args={[16, 1, 10]} />
-        <meshBasicMaterial color={ceilingColor} wireframe={ceilingWireframe} />
-      </mesh>
-      <mesh castShadow receiveShadow position={[0, 7, -10]}>
-        <boxGeometry args={[12, 1, 20]} />
-        <meshBasicMaterial color={ceilingColor} wireframe={ceilingWireframe} />
-      </mesh>
-
-      {/* Floor */}
-      <mesh receiveShadow castShadow position={[0, -5.5, -14]}>
-        <boxGeometry args={[14, 1, 14]} />
-        <meshStandardMaterial
-          color={corridorColor}
-          wireframe={corridorWireframe}
-          roughness={1}
-          metalness={0}
-        />
-      </mesh>
+      {/* Unified Tunnel Box */}
+      {tunnelVisible && (
+        <mesh
+          position={[0, tunnelYPosition, tunnelZPosition]}
+          receiveShadow // Allow the tunnel to receive shadows from particles if they cast them
+        >
+          <boxGeometry args={[tunnelWidth, tunnelHeight, tunnelDepth]} />
+          <meshStandardMaterial
+            color={tunnelColor}
+            wireframe={tunnelWireframe}
+            side={THREE.BackSide} // Render the inside of the box
+          />
+        </mesh>
+      )}
 
       {/* Light source controlled by Leva */}
       <spotLight
