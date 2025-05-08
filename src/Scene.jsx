@@ -95,6 +95,18 @@ export default function Scene() {
     rotationRandomnessZ: { value: 0, min: 0, max: 1, step: 0.05 },
   });
 
+  // Leva controls for Camera
+  const cameraControls = useControls("Camera Controls", {
+    cameraX: { value: -3.1, min: -50, max: 50, step: 0.1 },
+    cameraY: { value: -3.6, min: -50, max: 50, step: 0.1 },
+    cameraZ: { value: -13, min: -50, max: 50, step: 0.1 },
+    fov: { value: 42, min: 10, max: 120, step: 1 },
+    // Optional: Add lookAt controls later if needed
+    // lookAtX: { value: 0, min: -20, max: 20, step: 0.1 },
+    // lookAtY: { value: 0.3, min: -20, max: 20, step: 0.1 },
+    // lookAtZ: { value: 0, min: -20, max: 20, step: 0.1 },
+  });
+
   // Set up scene and update light/target positions based on controls
   useEffect(() => {
     if (targetRef.current) {
@@ -144,8 +156,12 @@ export default function Scene() {
       {/* Main camera */}
       <PerspectiveCamera
         makeDefault
-        position={[-4, -1, -20]}
-        fov={45}
+        position={[
+          cameraControls.cameraX,
+          cameraControls.cameraY,
+          cameraControls.cameraZ,
+        ]}
+        fov={cameraControls.fov}
         near={0.1}
         far={200}
       />
