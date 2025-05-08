@@ -6,83 +6,137 @@ export default function TunnelParticles({
   boxSize = 10,
   boxDepth = 30,
   boxThickness = 2,
+  visible = true,
+  baseSize = 0.35,
+  sizeRandomness = 0.5,
+  baseColor = "#ffffff",
+  colorRandomness = 0.3,
+  baseRotationX = 0,
+  baseRotationY = 0,
+  baseRotationZ = 0,
+  rotationRandomnessX = 1.0,
+  rotationRandomnessY = 1.0,
+  rotationRandomnessZ = 1.0,
 }) {
   const meshRef = useRef();
+  const geomRef = useRef();
   const tempObject = useMemo(() => new THREE.Object3D(), []);
+  const tempColor = useMemo(() => new THREE.Color(), []);
 
-  // Generate instance matrices
-  const matrices = useMemo(() => {
+  const particleData = useMemo(() => {
     const matrices = [];
+    const colors = [];
     const halfBoxSize = boxSize / 2;
     const halfBoxThickness = boxThickness / 2;
 
-    for (let i = 0; i < count; i++) {
-      // Choose a random face (top, bottom, left, right)
-      const face = Math.floor(Math.random() * 4);
-      const sign = Math.random() > 0.5 ? -1 : 1;
+    const initialColor = new THREE.Color(baseColor);
 
+    for (let i = 0; i < count; i++) {
+      const face = Math.floor(Math.random() * 4);
       let x, y, z;
 
-      // Position based on the selected face
       if (face === 0) {
-        // Top face
         x = THREE.MathUtils.randFloatSpread(boxSize);
         y =
           halfBoxSize +
           THREE.MathUtils.randFloat(-halfBoxThickness, halfBoxThickness);
       } else if (face === 1) {
-        // Bottom face
         x = THREE.MathUtils.randFloatSpread(boxSize);
         y =
           -halfBoxSize +
           THREE.MathUtils.randFloat(-halfBoxThickness, halfBoxThickness);
       } else if (face === 2) {
-        // Left face
         x =
           -halfBoxSize +
           THREE.MathUtils.randFloat(-halfBoxThickness, halfBoxThickness);
         y = THREE.MathUtils.randFloatSpread(boxSize);
       } else {
-        // Right face
         x =
           halfBoxSize +
           THREE.MathUtils.randFloat(-halfBoxThickness, halfBoxThickness);
         y = THREE.MathUtils.randFloatSpread(boxSize);
       }
-
-      // Random z-position throughout the tunnel depth
       z = THREE.MathUtils.randFloatSpread(boxDepth);
 
-      // Create position vector and add some variation
-      const position = new THREE.Vector3(x, y, z);
-      const normal = position.clone().normalize();
-      position.addScaledVector(normal, 1);
+      tempObject.position.set(x, y, z);
 
-      // Set the matrix for this instance
-      tempObject.position.copy(position);
-      const scale = THREE.MathUtils.randFloat(0.2, 0.5);
-      tempObject.scale.set(scale, scale, scale);
+      const scaleFactor =
+        1 - sizeRandomness + Math.random() * 2 * sizeRandomness;
+      tempObject.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
       tempObject.rotation.set(
-        THREE.MathUtils.randFloat(0, Math.PI * 2),
-        THREE.MathUtils.randFloat(0, Math.PI * 2),
-        THREE.MathUtils.randFloat(0, Math.PI * 2)
+        baseRotationX +
+          (Math.random() - 0.5) * 2 * rotationRandomnessX * Math.PI,
+        baseRotationY +
+          (Math.random() - 0.5) * 2 * rotationRandomnessY * Math.PI,
+        baseRotationZ +
+          (Math.random() - 0.5) * 2 * rotationRandomnessZ * Math.PI
       );
       tempObject.updateMatrix();
-      matrices.push({ matrix: tempObject.matrix.clone() });
+      matrices.push(tempObject.matrix.clone());
+
+      tempColor.copy(initialColor);
+      if (colorRandomness > 0) {
+        const randomFactor = (Math.random() - 0.5) * 2 * colorRandomness;
+        tempColor.offsetHSL(
+          randomFactor * 0.3,
+          randomFactor * 0.3,
+          randomFactor * 0.3
+        );
+      }
+      colors.push(tempColor.r, tempColor.g, tempColor.b);
     }
+    return { matrices, colors };
+  }, [
+    count,
+    boxSize,
+    boxDepth,
+    boxThickness,
+    baseSize,
+    sizeRandomness,
+    baseColor,
+    colorRandomness,
+    baseRotationX,
+    baseRotationY,
+    baseRotationZ,
+    rotationRandomnessX,
+    rotationRandomnessY,
+    rotationRandomnessZ,
+    tempObject,
+    tempColor,
+  ]);
 
-    return matrices;
-  }, [count, boxSize, boxDepth, boxThickness, tempObject]);
-
-  // Update instance matrices
   useEffect(() => {
-    if (meshRef.current) {
-      matrices.forEach((matrix, i) => {
-        meshRef.current.setMatrixAt(i, matrix.matrix);
-      });
-      meshRef.current.instanceMatrix.needsUpdate = true;
+    if (!meshRef.current || !geomRef.current) return;
+
+    for (let i = 0; i < particleData.matrices.length; i++) {
+      meshRef.current.setMatrixAt(i, particleData.matrices[i]);
     }
-  }, [matrices]);
+    meshRef.current.instanceMatrix.needsUpdate = true;
+
+    const colorAttribute = geomRef.current.getAttribute("color");
+    if (colorAttribute) {
+      for (let i = 0; i < particleData.colors.length / 3; i++) {
+        tempColor.fromArray(particleData.colors, i * 3);
+        colorAttribute.setXYZ(i, tempColor.r, tempColor.g, tempColor.b);
+      }
+      colorAttribute.needsUpdate = true;
+    }
+
+    meshRef.current.count = particleData.matrices.length;
+  }, [particleData, tempColor]);
+
+  const particleGeometry = useMemo(() => {
+    const geo = new THREE.BoxGeometry(baseSize, baseSize, baseSize);
+    const colorsArray = new Float32Array(count * 3);
+    const colorAttrib = new THREE.InstancedBufferAttribute(colorsArray, 3);
+    geo.setAttribute("color", colorAttrib);
+    return geo;
+  }, [baseSize, count]);
+
+  if (!visible) {
+    return null;
+  }
 
   return (
     <instancedMesh
@@ -91,8 +145,8 @@ export default function TunnelParticles({
       castShadow
       receiveShadow
     >
-      <boxGeometry args={[0.5, 0.5, 0.5]} />
-      <meshStandardMaterial color="white" roughness={1} metalness={0} />
+      <primitive object={particleGeometry} attach="geometry" ref={geomRef} />
+      <meshStandardMaterial roughness={1} metalness={0} vertexColors={true} />
     </instancedMesh>
   );
 }

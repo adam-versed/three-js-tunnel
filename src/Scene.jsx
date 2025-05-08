@@ -65,6 +65,7 @@ export default function Scene() {
     tunnelDepth,
     tunnelYPosition,
     tunnelZPosition,
+    tunnelReceiveShadow,
   } = useControls("Tunnel Controls", {
     tunnelVisible: true,
     tunnelColor: "#1f1f1f", // Slightly dark grey
@@ -74,6 +75,26 @@ export default function Scene() {
     tunnelDepth: { value: 45, min: 10, max: 300, step: 1 },
     tunnelYPosition: { value: 0.2, min: -20, max: 20, step: 0.25 },
     tunnelZPosition: { value: 10, min: -50, max: 50, step: 1 },
+    tunnelReceiveShadow: false,
+  });
+
+  // Leva controls for TunnelParticles
+  const particleControls = useControls("Particle Controls", {
+    particlesVisible: true,
+    baseCount: { value: 2500, min: 100, max: 10000, step: 100 },
+    densityFactor: { value: 1.0, min: 0.1, max: 3.0, step: 0.1 },
+    baseSize: { value: 0.35, min: 0.05, max: 1.0, step: 0.01 },
+    sizeRandomness: { value: 0.5, min: 0, max: 1, step: 0.05 }, // 0 = no random, 1 = full random spread
+    baseColor: "#ffffff",
+    colorRandomness: { value: 0.3, min: 0, max: 1, step: 0.05 },
+    // Base rotation (in radians for simplicity, can convert from degrees in leva if preferred)
+    baseRotationX: { value: 0, min: 0, max: Math.PI * 2, step: 0.01 },
+    baseRotationY: { value: 0, min: 0, max: Math.PI * 2, step: 0.01 },
+    baseRotationZ: { value: 0, min: 0, max: Math.PI * 2, step: 0.01 },
+    // Rotation randomness (factor)
+    rotationRandomnessX: { value: 1.0, min: 0, max: 1, step: 0.05 }, // 1 = full random like current
+    rotationRandomnessY: { value: 1.0, min: 0, max: 1, step: 0.05 },
+    rotationRandomnessZ: { value: 1.0, min: 0, max: 1, step: 0.05 },
   });
 
   // Set up scene and update light/target positions based on controls
@@ -135,18 +156,46 @@ export default function Scene() {
       <group ref={groupRef}>
         <group ref={section1Ref} position={[0, 0, 0]}>
           <TunnelParticles
-            count={2500}
-            boxSize={10}
+            count={Math.floor(
+              particleControls.baseCount * particleControls.densityFactor
+            )} // Dynamic count
+            boxSize={10} // These might become dynamic later or derived if needed
             boxDepth={30}
             boxThickness={2}
+            // Pass new particle props
+            visible={particleControls.particlesVisible}
+            baseSize={particleControls.baseSize}
+            sizeRandomness={particleControls.sizeRandomness}
+            baseColor={particleControls.baseColor}
+            colorRandomness={particleControls.colorRandomness}
+            baseRotationX={particleControls.baseRotationX}
+            baseRotationY={particleControls.baseRotationY}
+            baseRotationZ={particleControls.baseRotationZ}
+            rotationRandomnessX={particleControls.rotationRandomnessX}
+            rotationRandomnessY={particleControls.rotationRandomnessY}
+            rotationRandomnessZ={particleControls.rotationRandomnessZ}
           />
         </group>
         <group ref={section2Ref} position={[0, 0, -29]}>
           <TunnelParticles
-            count={2500}
+            count={Math.floor(
+              particleControls.baseCount * particleControls.densityFactor
+            )} // Dynamic count
             boxSize={10}
             boxDepth={30}
             boxThickness={2}
+            // Pass new particle props
+            visible={particleControls.particlesVisible}
+            baseSize={particleControls.baseSize}
+            sizeRandomness={particleControls.sizeRandomness}
+            baseColor={particleControls.baseColor}
+            colorRandomness={particleControls.colorRandomness}
+            baseRotationX={particleControls.baseRotationX}
+            baseRotationY={particleControls.baseRotationY}
+            baseRotationZ={particleControls.baseRotationZ}
+            rotationRandomnessX={particleControls.rotationRandomnessX}
+            rotationRandomnessY={particleControls.rotationRandomnessY}
+            rotationRandomnessZ={particleControls.rotationRandomnessZ}
           />
         </group>
       </group>
@@ -155,7 +204,7 @@ export default function Scene() {
       {tunnelVisible && (
         <mesh
           position={[0, tunnelYPosition, tunnelZPosition]}
-          receiveShadow // Allow the tunnel to receive shadows from particles if they cast them
+          receiveShadow={tunnelReceiveShadow}
         >
           <boxGeometry args={[tunnelWidth, tunnelHeight, tunnelDepth]} />
           <meshStandardMaterial
