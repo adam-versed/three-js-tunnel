@@ -55,6 +55,15 @@ export default function Scene() {
     helperColor: "#ff0000",
   });
 
+  // Controls for Corridor (Walls and Floor) and Ceiling
+  const { corridorColor, corridorWireframe, ceilingColor, ceilingWireframe } =
+    useControls("Corridor Controls", {
+      corridorColor: "#101010",
+      corridorWireframe: false,
+      ceilingColor: "#080808",
+      ceilingWireframe: false,
+    });
+
   // Set up scene and update light/target positions based on controls
   useEffect(() => {
     if (targetRef.current) {
@@ -133,27 +142,38 @@ export default function Scene() {
       {/* Tunnel walls */}
       <mesh receiveShadow position={[7, 0, 0]}>
         <boxGeometry args={[1, 14, 26]} />
-        <meshStandardMaterial color="#101010" />
+        <meshStandardMaterial
+          color={corridorColor}
+          wireframe={corridorWireframe}
+        />
       </mesh>
       <mesh receiveShadow position={[-7, 0, 0]}>
         <boxGeometry args={[1, 14, 26]} />
-        <meshStandardMaterial color="#101010" />
+        <meshStandardMaterial
+          color={corridorColor}
+          wireframe={corridorWireframe}
+        />
       </mesh>
 
       {/* Ceiling pieces */}
       <mesh castShadow receiveShadow position={[0, 7, -5]}>
         <boxGeometry args={[16, 1, 10]} />
-        <meshBasicMaterial color="#080808" />
+        <meshBasicMaterial color={ceilingColor} wireframe={ceilingWireframe} />
       </mesh>
       <mesh castShadow receiveShadow position={[0, 7, -10]}>
         <boxGeometry args={[12, 1, 20]} />
-        <meshBasicMaterial color="#080808" />
+        <meshBasicMaterial color={ceilingColor} wireframe={ceilingWireframe} />
       </mesh>
 
       {/* Floor */}
       <mesh receiveShadow castShadow position={[0, -5.5, -14]}>
         <boxGeometry args={[14, 1, 14]} />
-        <meshStandardMaterial color="#303030" roughness={1} metalness={0} />
+        <meshStandardMaterial
+          color={corridorColor}
+          wireframe={corridorWireframe}
+          roughness={1}
+          metalness={0}
+        />
       </mesh>
 
       {/* Light source controlled by Leva */}
