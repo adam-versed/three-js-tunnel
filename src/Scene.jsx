@@ -1,11 +1,17 @@
 import React, { useRef, useState, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import { PerspectiveCamera, useHelper } from "@react-three/drei";
-import { EffectComposer, Bloom, Noise } from "@react-three/postprocessing";
-import { BlendFunction } from "postprocessing";
+import {
+  EffectComposer,
+  Bloom,
+  Noise,
+  GodRays,
+} from "@react-three/postprocessing";
+import { BlendFunction, KernelSize } from "postprocessing";
 import * as THREE from "three";
 import { SpotLightHelper } from "three";
 import TunnelParticles from "./components/TunnelParticles";
+import VolumetricLightShader from "./shaders/VolumetricLightShader";
 import { useControls } from "leva";
 
 export default function Scene() {
@@ -142,6 +148,33 @@ export default function Scene() {
     // lookAtX: { value: 0, min: -20, max: 20, step: 0.1 },
     // lookAtY: { value: 0.3, min: -20, max: 20, step: 0.1 },
     // lookAtZ: { value: 0, min: -20, max: 20, step: 0.1 },
+  });
+
+  // Leva controls for Bloom effect
+  const bloomControls = useControls("Bloom Controls", {
+    bloomEnabled: { value: true, label: "Enable Bloom" },
+    bloomIntensity: {
+      value: 0.85,
+      min: 0,
+      max: 3,
+      step: 0.01,
+      label: "Intensity",
+    },
+    luminanceThreshold: {
+      value: 0.11,
+      min: 0,
+      max: 1,
+      step: 0.01,
+      label: "Threshold",
+    },
+    luminanceSmoothing: {
+      value: 0.21,
+      min: 0,
+      max: 1,
+      step: 0.01,
+      label: "Smoothing",
+    },
+    // kernelSize and mipmapBlur are not controlled by Leva for now to keep it simpler
   });
 
   // Set up scene and update light/target positions based on controls
@@ -307,13 +340,18 @@ export default function Scene() {
 
       {/* Post-processing effects */}
       <EffectComposer>
-        <Bloom
-          intensity={2.5}
-          kernelSize={3}
-          luminanceThreshold={0.2}
-          luminanceSmoothing={0.9}
-        />
-        <Noise opacity={0.025} blendFunction={BlendFunction.OVERLAY} />
+        {/* Custom Volumetric Light Shader Effect */}
+        <VolumetricLightShader light={lightRef} />
+        {bloomControls.bloomEnabled && (
+          <Bloom
+            luminanceThreshold={bloomControls.luminanceThreshold}
+            luminanceSmoothing={bloomControls.luminanceSmoothing}
+            intensity={bloomControls.bloomIntensity}
+            kernelSize={KernelSize.HUGE} // KernelSize is now correctly imported
+            mipmapBlur
+          />
+        )}
+        <Noise opacity={0.02} />
       </EffectComposer>
     </>
   );

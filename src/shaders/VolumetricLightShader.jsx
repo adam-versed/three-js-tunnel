@@ -1,280 +1,138 @@
-import { forwardRef, useImperativeHandle, useRef, useMemo } from "react";
-import { Effect, BlendFunction } from "postprocessing";
+import {
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+  useMemo,
+  useEffect,
+} from "react";
+import { Effect, BlendFunction, EffectAttribute } from "postprocessing";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
+import { useControls } from "leva"; // Re-enable Leva
 
-// Import shader code as raw strings
+// Minimal Fragment Shader (Green Tint with Forced Alpha)
+// const minimalFragmentShader = `...`; // Old minimal shader
+
+// New GodRays fragment shader
 const fragmentShader = `
-uniform sampler2D inputBuffer;
-uniform sampler2D blueNoiseTexture;
-uniform sampler2D noiseTexture;
-uniform mat4 projectionMatrixInverse;
-uniform mat4 viewMatrixInverse;
-uniform vec3 lightPosition;
-uniform vec3 lightDirection;
-uniform vec3 cameraPosition;
-uniform float cameraFar;
-uniform float cameraNear;
-uniform float coneAngle;
-uniform float uFrame;
+// varying vec2 vUv; // REMOVED: Provided by postprocessing library
 
-varying vec2 vUv;
+uniform sampler2D tInput;
+uniform vec2 lightPosition; // Screen-space light position (-1 to 1)
+uniform float fExposure;
+uniform float fDecay;
+uniform float fDensity;
+uniform float fWeight;
+uniform int uSamples;     // Number of samples
+uniform bool uBlur;       // New uniform for toggling blur
 
-#define NUM_SAMPLES 100
-#define DENSITY 0.975
-#define LIGHT_ATTENUATION 5.0
-#define MAX_DIST 100.0
+const int MAX_SAMPLES = 120; // Max samples to avoid hardware limits in loop
 
-// Credit: https://www.shadertoy.com/view/4djSRW
-float hash13(vec3 p3) {
-  p3 = fract(p3 * 0.1031);
-  p3 += dot(p3, p3.zyx + 31.32);
-  return fract((p3.x + p3.y) * p3.z);
-}
-
-// Ray-cone intersection
-float rayConeIntersect(vec3 rayOrigin, vec3 rayDir, vec3 coneOrigin, vec3 coneDir, float coneAngle) {
-  rayOrigin -= coneOrigin;
-  float a = dot(rayDir, coneDir) - cos(radians(coneAngle)) * length(rayDir);
-  float b = dot(rayOrigin, coneDir) - cos(radians(coneAngle)) * length(rayOrigin);
-  if (a >= 0.0 && b >= 0.0) return 0.0;
-  if (a < 0.0 && b > 0.0) return -b / a;
-  return MAX_DIST;
-}
-
-// Fragment depth from clip space depth
-float getDepth(vec2 uv) {
-  return texture2D(inputBuffer, uv).a;
-}
-
-// Convert screen space to world space
-vec3 getWorldPos(vec2 uv, float depth) {
-  float z = depth * 2.0 - 1.0;
-  vec4 clipSpacePosition = vec4(uv * 2.0 - 1.0, z, 1.0);
-  vec4 viewSpacePosition = projectionMatrixInverse * clipSpacePosition;
-  
-  viewSpacePosition /= viewSpacePosition.w;
-  vec4 worldSpacePosition = viewMatrixInverse * viewSpacePosition;
-  
-  return worldSpacePosition.xyz;
-}
-
-// Light attenuation
-float lightAttenuation(float dist) {
-  return 1.0 / (1.0 + dist * dist * LIGHT_ATTENUATION);
-}
-
-// Noise lookup functions
-float noise(vec3 pos, float frequency) {
-  vec2 noiseUV = fract(pos.xz * frequency);
-  return texture2D(noiseTexture, noiseUV).r;
-}
-
-// This function is required by PostProcessing
-void mainUv(inout vec2 uv) {
-  // UV coordinates remain unchanged
-}
-
-// This function is required by PostProcessing and is the main entry point
+// Replaced main() with mainImage to conform to postprocessing Effect requirements
 void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
-  vec4 color = inputColor;
-  float depth = getDepth(uv);
-  
-  // Reconstruct world position from depth
-  vec3 worldPos = getWorldPos(uv, depth);
-  
-  // Ray origin (camera position) and direction
-  vec3 rayOrigin = cameraPosition;
-  vec3 rayDir = normalize(worldPos - rayOrigin);
-  
-  // Ray length from camera to the visible surface
-  float rayLength = length(worldPos - rayOrigin);
-  
-  // Test if ray intersects light cone
-  float intersect = rayConeIntersect(
-    rayOrigin, rayDir, 
-    lightPosition, normalize(lightDirection), 
-    coneAngle
-  );
-  
-  if (intersect > 0.0 && intersect < rayLength) {
-    // Blue noise for randomization
-    vec2 blueNoiseUV = fract(uv + vec2(uFrame * 0.001));
-    float blueNoise = texture2D(blueNoiseTexture, blueNoiseUV).r;
-    
-    // Sample count and step size
-    float stepSize = rayLength / float(NUM_SAMPLES);
-    float randomOffset = blueNoise * stepSize;
-    
-    // Accumulate light along the ray
-    float density = 0.0;
-    
-    for (int i = 0; i < NUM_SAMPLES; i++) {
-      float t = randomOffset + float(i) * stepSize;
-      if (t > rayLength) break;
-      
-      // Position along ray
-      vec3 pos = rayOrigin + rayDir * t;
-      
-      // Distance from position to light
-      float distToLight = length(pos - lightPosition);
-      
-      // Check if position is inside light cone
-      vec3 toLight = normalize(lightPosition - pos);
-      float dotLight = dot(toLight, normalize(-lightDirection));
-      float coneCosine = cos(radians(coneAngle));
-      
-      if (dotLight > coneCosine) {
-        // Add noise for volumetric effect
-        float n = noise(pos, 0.1) * noise(pos * 2.0, 0.05);
-        
-        // Light attenuation based on distance
-        float att = lightAttenuation(distToLight);
-        
-        // Stronger effect closer to light axis
-        float axisWeight = (dotLight - coneCosine) / (1.0 - coneCosine);
-        axisWeight = pow(axisWeight, 2.0);
-        
-        // Accumulate light contribution
-        density += att * axisWeight * n * DENSITY * stepSize;
-      }
+    vec2 texCoord = uv; // UPDATED: Use uv from mainImage arguments (screen UVs)
+    vec2 deltaTexCoord = (texCoord - lightPosition);
+    deltaTexCoord *= 1.0 / float(uSamples) * fDensity; // Adjust step based on density & samples
+    float illuminationDecay = 1.0;
+    vec4 FragColor = vec4(0.0);
+
+    for (int i = 0; i < min(uSamples, MAX_SAMPLES); i++) {
+        texCoord -= deltaTexCoord;
+        vec4 currentSampleColor;
+
+        if (uBlur) {
+            // 5-tap blur (center weighted)
+            vec4 s = texture2D(tInput, texCoord) * 0.4; // Center sample
+            s += texture2D(tInput, texCoord + vec2(texelSize.x, 0.0)) * 0.15;  // Right
+            s += texture2D(tInput, texCoord - vec2(texelSize.x, 0.0)) * 0.15;  // Left
+            s += texture2D(tInput, texCoord + vec2(0.0, texelSize.y)) * 0.15;  // Up
+            s += texture2D(tInput, texCoord - vec2(0.0, texelSize.y)) * 0.15;  // Down
+            currentSampleColor = s;
+        } else {
+            currentSampleColor = texture2D(tInput, texCoord);
+        }
+
+        currentSampleColor *= illuminationDecay * fWeight; // Apply weight and decay
+        FragColor += currentSampleColor;
+        illuminationDecay *= fDecay; // Decay for next sample
     }
-    
-    // Add volumetric lighting to color
-    vec3 lightColor = vec3(1.0, 1.0, 1.0);
-    color.rgb += lightColor * density;
-  }
-  
-  outputColor = color;
+    FragColor *= fExposure; // Apply exposure
+    outputColor = FragColor;
 }
 `;
 
-const vertexShader = `
-varying vec2 vUv;
-varying vec3 vWorldPosition;
-varying vec3 vViewPosition;
-varying vec4 vClipPosition;
-
-void main() {
-  vUv = uv;
-  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-  vWorldPosition = worldPosition.xyz;
-  
-  vec4 modelViewPosition = modelViewMatrix * vec4(position, 1.0);
-  vViewPosition = -modelViewPosition.xyz;
-  
-  gl_Position = projectionMatrix * modelViewPosition;
-  vClipPosition = gl_Position;
-}
-`;
-
-// Create noise textures
-const createNoiseTexture = (size = 256) => {
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  const imageData = ctx.createImageData(size, size);
-  const data = imageData.data;
-
-  for (let i = 0; i < data.length; i += 4) {
-    const val = Math.random() * 255;
-    data[i] = val;
-    data[i + 1] = val;
-    data[i + 2] = val;
-    data[i + 3] = 255;
-  }
-
-  ctx.putImageData(imageData, 0, 0);
-
-  const texture = new Image();
-  texture.src = canvas.toDataURL();
-  return texture;
-};
-
-// Custom effect class for post-processing
+// Effect Class Structure (now being fleshed out)
 class VolumetricLightEffect extends Effect {
   constructor() {
-    super("VolumetricLightEffect", fragmentShader, {
-      blendFunction: BlendFunction.ADD,
-      vertexShader,
+    super("GodRaysEffect", fragmentShader, {
+      // Updated effect name
+      blendFunction: BlendFunction.SCREEN, // Changed to SCREEN as per plan
+      // attributes: EffectAttribute.DEPTH, // REMOVED: Not needed for this screen-space shader
       uniforms: new Map([
-        ["cameraFar", new THREE.Uniform(500)],
-        ["cameraNear", new THREE.Uniform(0.01)],
-        ["projectionMatrixInverse", new THREE.Uniform(new THREE.Matrix4())],
-        ["viewMatrixInverse", new THREE.Uniform(new THREE.Matrix4())],
-        ["lightDirection", new THREE.Uniform(new THREE.Vector3(0, 0, 1))],
-        ["lightPosition", new THREE.Uniform(new THREE.Vector3(1, 1, 1))],
-        ["cameraPosition", new THREE.Uniform(new THREE.Vector3(0, 0, 0))],
-        ["coneAngle", new THREE.Uniform(40)],
-        ["blueNoiseTexture", new THREE.Uniform(null)],
-        ["noiseTexture", new THREE.Uniform(null)],
-        ["uFrame", new THREE.Uniform(0)],
+        ["fExposure", new THREE.Uniform(0.6)],
+        ["fDecay", new THREE.Uniform(0.92)],
+        ["fDensity", new THREE.Uniform(0.5)],
+        ["fWeight", new THREE.Uniform(0.3)],
+        ["lightPosition", new THREE.Uniform(new THREE.Vector2(0.0, 0.0))],
+        ["uSamples", new THREE.Uniform(100)],
+        ["uBlur", new THREE.Uniform(false)], // Added uBlur uniform
       ]),
     });
-
-    // Create and set up textures
-    this.blueNoiseImg = createNoiseTexture(256);
-    this.noiseImg = createNoiseTexture(512);
-
-    this.blueNoiseImg.onload = () => {
-      const texture = new THREE.Texture(this.blueNoiseImg);
-      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-      texture.needsUpdate = true;
-      this.uniforms.get("blueNoiseTexture").value = texture;
-    };
-
-    this.noiseImg.onload = () => {
-      const texture = new THREE.Texture(this.noiseImg);
-      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-      texture.needsUpdate = true;
-      this.uniforms.get("noiseTexture").value = texture;
-    };
   }
 
-  update(renderer, inputBuffer, deltaTime) {
-    // Update shader uniforms
-    this.uniforms.get("uFrame").value += 1;
-  }
+  // REMOVED update method: iResolution and iTime are not directly used by the new shader
+  // or are handled by the postprocessing library.
 }
 
-// React component wrapper for the effect
+// React Component Structure (now being fleshed out)
 const VolumetricLightShader = forwardRef(function VolumetricLightShader(
   props,
   ref
 ) {
   const effectRef = useRef();
-  const { camera } = useThree();
+  const { camera } = useThree(); // Removed clock as iTime is not used
   const effect = useMemo(() => new VolumetricLightEffect(), []);
 
-  // Update effect every frame
+  // Leva controls for new God Rays parameters
+  const shaderControls = useControls("God Rays Params", {
+    exposure: { value: 0.6, min: 0.0, max: 2.0, step: 0.01 },
+    decay: { value: 0.9, min: 0.0, max: 1.0, step: 0.01 }, // Adjusted from 0.92
+    density: { value: 0.6, min: 0.0, max: 2.0, step: 0.01 }, // Adjusted from 0.5
+    weight: { value: 0.2, min: 0.0, max: 1.0, step: 0.01 }, // Adjusted from 0.3
+    samples: { value: 120, min: 10, max: 120, step: 1 }, // Adjusted from 100, max also 120
+    blur: { value: false, label: "Blur" },
+  });
+
+  useImperativeHandle(ref, () => effect, [effect]);
+
+  // Update uniforms in useFrame
   useFrame(() => {
-    if (effect) {
-      // Update camera uniforms
-      effect.uniforms.get("cameraFar").value = camera.far;
-      effect.uniforms.get("cameraNear").value = camera.near;
-      effect.uniforms.get("projectionMatrixInverse").value =
-        camera.projectionMatrixInverse;
-      effect.uniforms.get("viewMatrixInverse").value = camera.matrixWorld;
-      effect.uniforms.get("cameraPosition").value = camera.position;
+    if (effect && props.light && props.light.current) {
+      const light = props.light.current;
+      const worldPos = new THREE.Vector3();
+      light.getWorldPosition(worldPos); // Get light's world position
 
-      // Update light uniforms
-      // These values would be properly linked to the scene lights in a full implementation
-      const lightPos = new THREE.Vector3(-7, 12, 3);
-      const lightTarget = new THREE.Vector3(0, 4, 7);
-      const lightDir = new THREE.Vector3()
-        .subVectors(lightTarget, lightPos)
-        .normalize();
+      const screenPos = worldPos.clone().project(camera); // Project to screen space (-1 to 1)
 
-      effect.uniforms.get("lightDirection").value = lightDir;
-      effect.uniforms.get("lightPosition").value = lightPos;
+      // Convert screenPos from [-1, 1] to [0, 1] for UV space
+      screenPos.x = (screenPos.x + 1.0) * 0.5;
+      screenPos.y = (screenPos.y + 1.0) * 0.5;
+
+      effect.uniforms.get("lightPosition").value.set(screenPos.x, screenPos.y);
+      effect.uniforms.get("fExposure").value = shaderControls.exposure;
+      effect.uniforms.get("fDecay").value = shaderControls.decay;
+      effect.uniforms.get("fDensity").value = shaderControls.density;
+      effect.uniforms.get("fWeight").value = shaderControls.weight;
+      effect.uniforms.get("uSamples").value = shaderControls.samples;
+      effect.uniforms.get("uBlur").value = shaderControls.blur; // Update uBlur uniform
+
+      // Remove old uniform updates (iTime, cameraPosition, projectionMatrixInverse, etc.)
     }
   });
 
-  // Expose the effect ref to parent components
-  useImperativeHandle(ref, () => effect, [effect]);
+  // Removed old useEffect for tintColor as it's no longer used
 
-  return <primitive ref={effectRef} object={effect} {...props} />;
+  return <primitive ref={effectRef} object={effect} />;
 });
 
 export default VolumetricLightShader;
